@@ -1,0 +1,75 @@
+import torch
+import torch.nn as nn
+from torch_geometric.nn.kge import KGEModel
+
+
+class Encoder(torch.nn.Module):
+    """Concatenate node features with embeddings."""
+
+    def __init__(self, num_nodes: int, embedding_dim: int, features: torch.tensor):
+        """
+        Args:
+            num_nodes (int): Number of nodes in the graph.
+            embedding_dim (int): Dimension of the node embeddings.
+            features (torch.tensor): Node features of shape (num_nodes, feature_dim).
+        """
+        super(Encoder, self).__init__()
+        assert features.shape[0] == num_nodes, "Number of nodes and features mismatch"
+        self.features = features
+        self.features.requires_grad = False
+        self.embedding = torch.nn.Embedding(num_nodes, embedding_dim)
+
+    def to(self, device):
+        """Move the encoder to the specified device."""
+        super().to(device)
+        self.features = self.features.to(device)
+        return self
+
+    def forward(self, indices):
+        emb = self.embedding(indices)
+        feat = self.features[indices]
+        return torch.cat([emb, feat], dim=1)
+
+    @property
+    def embedding_dim(self):
+        return self.embedding.embedding_dim + self.features.shape[1]
+
+    def reset_parameters(self):
+        self.embedding.reset_parameters()
+
+    @property
+    def weight(self):
+        return self.embedding.weight
+
+
+def patch_kge_model(model: KGEModel, encoder: nn.Module, encoder_dim: int):
+    """
+    Patch the KGE model to use the encoder for node embeddings.
+    Args:
+        model (KGEModel): The KGE model to patch.
+        encoder (nn.Module): The encoder to use for node embeddings.
+        encoder_dim (int): The dimension of the encoder output.
+    """
+    model.node_emb = encoder
+    model.rel_emb = torch.nn.Embedding(
+        model.num_relations, encoder_dim, sparse=model.rel_emb.sparse
+    )
+    model.hidden_channels = encoder_dim
+
+
+"""
+from torch_geometric.nn.kge import DistMult
+
+m = DistMult(5, 2, 2)
+inp = (
+    torch.tensor([1, 2, 3]),  # head_index
+    torch.tensor([0, 1, 1]),  # rel_type
+    torch.tensor([0, 1, 2]),  # tail_index
+)
+print(m(*inp))
+
+enc = Encoder(5, 2, torch.randn(5, 2))
+patch_kge_model(m, enc)
+
+print(m(*inp))
+"""
