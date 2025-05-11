@@ -1,4 +1,5 @@
 import argparse
+import tempfile
 
 import torch
 import torch.optim as optim
@@ -73,7 +74,7 @@ loader = model.loader(
 
 optimizer_map = {
     "transe": optim.Adam(model.parameters(), lr=0.01),
-    "distmult": optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-6),
+    "distmult": optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-6),
     "rotate": optim.Adam(model.parameters(), lr=1e-3),
 }
 optimizer = optimizer_map[args.model]
@@ -104,15 +105,29 @@ def test(data):
     )
 
 
-for epoch in range(1, 501):
-    loss = train()
-    print(f"Epoch: {epoch:03d}, Loss: {loss:.4f}")
-    if epoch % 25 == 0:
-        rank, mrr, hits = test(val_data)
-        print(
-            f"Epoch: {epoch:03d}, Val Mean Rank: {rank:.2f}, "
-            f"Val MRR: {mrr:.4f}, Val Hits@10: {hits:.4f}"
-        )
+best_hits = 0
+with tempfile.TemporaryDirectory() as tmpdir:
+    for epoch in range(1, 501):
+        loss = train()
+        print(f"Epoch: {epoch:03d}, Loss: {loss:.4f}")
+        if epoch % 25 == 0:
+            rank, mrr, hits = test(val_data)
+            print(
+                f"Epoch: {epoch:03d}, Val Mean Rank: {rank:.2f}, "
+                f"Val MRR: {mrr:.4f}, Val Hits@10: {hits:.4f}"
+            )
+            if hits > best_hits:
+                best_hits = hits
+                torch.save(
+                    {"model": model.state_dict()},
+                    f"{tmpdir}/best_model.pt",
+                )
+                print(f"Saved new best model with Hits@10: {hits:.4f}")
+
+    # load the best model
+    print("Loading best model with Hits@10:", best_hits)
+    model.load_state_dict(torch.load(f"{tmpdir}/best_model.pt")["model"])
+
 
 rank, mrr, hits_at_10 = test(test_data)
 print(f"Test Mean Rank: {rank:.2f}, Test MRR: {mrr:.4f}, " f"Test Hits@10: {hits_at_10:.4f}")

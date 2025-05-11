@@ -14,7 +14,9 @@ class Encoder(torch.nn.Module):
             features (torch.tensor): Node features of shape (num_nodes, feature_dim).
         """
         super(Encoder, self).__init__()
-        assert features.shape[0] == num_nodes, "Number of nodes and features mismatch"
+        assert (
+            features.shape[0] == num_nodes
+        ), f"Number of nodes and features mismatch. {features.shape[0]} vs {num_nodes}"
         self.features = features
         self.features.requires_grad = False
         self.embedding = torch.nn.Embedding(num_nodes, embedding_dim)
@@ -55,21 +57,3 @@ def patch_kge_model(model: KGEModel, encoder: nn.Module, encoder_dim: int):
         model.num_relations, encoder_dim, sparse=model.rel_emb.sparse
     )
     model.hidden_channels = encoder_dim
-
-
-"""
-from torch_geometric.nn.kge import DistMult
-
-m = DistMult(5, 2, 2)
-inp = (
-    torch.tensor([1, 2, 3]),  # head_index
-    torch.tensor([0, 1, 1]),  # rel_type
-    torch.tensor([0, 1, 2]),  # tail_index
-)
-print(m(*inp))
-
-enc = Encoder(5, 2, torch.randn(5, 2))
-patch_kge_model(m, enc)
-
-print(m(*inp))
-"""
