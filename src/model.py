@@ -19,7 +19,10 @@ class Encoder(torch.nn.Module):
         ), f"Number of nodes and features mismatch. {features.shape[0]} vs {num_nodes}"
         self.features = features
         self.features.requires_grad = False
-        self.embedding = torch.nn.Embedding(num_nodes, embedding_dim)
+        if embedding_dim > 0:
+            self.embedding = torch.nn.Embedding(num_nodes, embedding_dim)
+        else:
+            self.embedding = None
 
     def to(self, device):
         """Move the encoder to the specified device."""
@@ -28,16 +31,21 @@ class Encoder(torch.nn.Module):
         return self
 
     def forward(self, indices):
-        emb = self.embedding(indices)
         feat = self.features[indices]
-        return torch.cat([emb, feat], dim=1)
+        z = [feat]
+        if self.embedding is not None:
+            z.append(self.embedding(indices))
+        return torch.cat(z, dim=1)
 
     @property
     def embedding_dim(self):
+        if self.embedding is None:
+            return self.features.shape[1]
         return self.embedding.embedding_dim + self.features.shape[1]
 
     def reset_parameters(self):
-        self.embedding.reset_parameters()
+        if self.embedding is not None:
+            self.embedding.reset_parameters()
 
     @property
     def weight(self):

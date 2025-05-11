@@ -22,6 +22,7 @@ parser.add_argument("--features", type=str, required=False)
 # Binary flag whether to use Linear in the encoder or not
 parser.add_argument("--use_linear", action="store_true", help="Use Linear in the encoder")
 parser.add_argument("--embedding_dim", type=int, default=50, help="Embedding dimension")
+parser.add_argument("--epochs", type=int, default=500, help="Number of epochs")
 args = parser.parse_args()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -107,7 +108,7 @@ def test(data):
 
 best_hits = 0
 with tempfile.TemporaryDirectory() as tmpdir:
-    for epoch in range(1, 501):
+    for epoch in range(1, args.epochs + 1):
         loss = train()
         print(f"Epoch: {epoch:03d}, Loss: {loss:.4f}")
         if epoch % 25 == 0:
